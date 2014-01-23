@@ -1,0 +1,267 @@
+6.3.13 - Started with restoring src directory to the backup when nstorage = bstorage/c2n. The model runs without any problems from 11/15/02 -  1/03/03.
+6.4.13  
+RUN: 
+Checked model run again. 
+-Nstorage starts out as 0 for all cohorts on day 1 
+-Forest N is conserved
+__________________________________________________
+BSTORAGE/C2N STORAGE .NE. NSTORAGE - problem 
+
+ 
+
+HOWEVER nstorage .ne. bstorage/c2n when new recruits are created. This happens at the end of the month, in the reproduction file (after  call deallocate_patchtype(cpatch) /line 261). when I print a statement telling the program to stop if nstoarge and bstorage/c2n are not equal, I get a segmentation fault.. without the print statement the file runs ok but stops again because they are not equal
+
+If I print a statment saying it entered the deallocation subroutine, I also get a segmentation fault
+
+This was a problem before my leave. It is not related to the dynamics that I worked on. It is related to the initial setup of nstorage. 
+
+
+
+Met with David, looking into why model crashes with nstorage and
+bstorage/c2n.
+
+1) go to branch Nstorage
+2) build/bin  make clean
+3)/scpc:tiger:/home/jhlevy/ED2/ED.santarem/build/bin/include.mk.tiger.. change line in make file to run slower but identify the problem..
+4) compile and run model..Error message : 
+NEW RECRUIT
+forrtl: severe (408): fort: (2): Subscript #1 of the array NSTORAGE has value 17 which is greater than the upper bound of 16
+
+This means that hte program is looking for a 17th value for nstorage
+when there could only be 16. Either a 17th value was added to the
+array when it shoulddn't have been or the 17th value was left there when it should have been romoved in another process 
+
+5) went into reproduction file, found where NEW RECRUIT
+printed.. added a few lines to print 'ico' to see if this was problematic during my if statements, before or after copy recruit
+.. ran model again
+
+6) spoke about when to use nstoarge ... 1) reproduction 2) wetn over
+fixes n storage.. other then that it maybe it doesnt need to be
+used. If defoliation is added to model it can use it to regenerate
+leaves.
+
+7) also spoke about when to fill nstorage... when
+nstorage<nstorage_max vs nstrage + bleaf/c2n*0.48 < nstorage_max.. we
+did not come to a consensus before I left so I am keeping it at
+nstorage<nstorage_max for now
+
+BSTORAGE /C2N.NE.NSTORAGE ISSUE
+Found 3 problems:
+-PHENOLOGU.AUX file has a print statement that causes segementation error,
+-repro has print statements that are problematic because not in an icoloop, 
+- pn1 uses bstorage but pn2 uses nstroage... may be
+the source of the N loss in later dates when Nstoage .ne. bstorage
+
+ONCE these were all fixed, nstorage = bstorage/c2n. Ran model for a year, all looks good. forest n butdget  is closed
+
+6.11.13
+WENT BACK TO N_STORAGE_DYNAMICS branch (discussed below) and checked
+for these three problems. Problematic print statements in phen_aux and
+repro were removed and pn1 and pn2 both use nstorage. Conclusion: this issue did
+not carry over to the nstorage_dynamics branch. 
+
+BSTORAGE/C2N STORAGE .NE. NSTORAGE - problem solved
+__________________________________________________
+NDYNAMICS CHECK-start
+
+TO DO:
+Create a second branch that has the nitrogen dynamics that I added before my leave. Run the program without the creation of new cohorts and just test the dynamics that I added. 
+2) NEW BRANCH - Nstorage_dynamics..  restored to src4.15 file..
+Ran model from 11.15.02 to 1.03.03 and the model ran to completion. No obvious problems.ForestN start  1.072706 /Forest N end: 1.071894. I'm not sure if Forest N is loosing N so I extended the run from 11.15.03 to 1.03.04.. ForestN start  1.072706 /Forest N end: ForestN   1.064569cd ,.. .. the forest N decreases after the monthly calculations..
+
+6.5.13
+Run a simple version of the model where there is one cohort and one patch. See if dynamics looks like the expectation.
+
+ED2IN Settings changed:
+ 
+1) from  NL%IED_INIT_MODE = 2  to  NL%IED_INIT_MODE =  0
+2) from NL%INCLUDE_THESE_PFT = 1,2,3,4 to NL%INCLUDE_THESE_PFT = 2 
+3 )from NL%TREEFALL_DISTURBANCE_RATE  = 0.007 to NL%TREEFALL_DISTURBANCE_RATE =  0
+
+ED_params setting changed:
+seedling mortality = 1
+
+Look closely at code in Balive and structural_growth. Runs go to completion
+
+6.6.13
+CHECKS:
+
+1) check inputs
+Pools (When & How much, Daily, monthly, yearly jumps)
+-Nstorage - should fill from resorption and soil as long as <Nstorage_max - YES(10.31.03 Nstorage = max and no N is resorbed. Instead, fsn_in increase by max absorption*nplant)
+
+-Total plant nitrogen uptake, will increase if  Nstorage< Nstorage_max and Nsupply is available after CB is fulfilled, wont exceed supply
+- MSN - changes in proportion to total plant nitrogen uptake
+
+Fluxes (When & How much) 
+-Resorption -
+        max amount is N from leaf and root maintence costs*0.48     - YES
+        If resorption N available > max_Nstorage, extra N goes into FSN_in   - YES
+
+-nitrogen_uptake assocaited with MSN for Nstorage - 
+CHECK looks good. 12. 01.2002 
+         only occurs if Nstorage<Nstorage_max YES
+         nitrogen upake increases by the amount of nstorage increase-YES
+        Nstorage does not exceed nstorage_max - YES.. althought some rounding errors at E-5 decimal places
+N limited scenario (init_nbg soil N = 0)
+if nitrogen supply after growth = 0, nstorage does not increase even
+if it is wanted to reach nstorage max - YES ( satarting on day 1)
+all looks good 2.1.2003
+
+-FSN_in - 
+        Min gets 52% of N from leaf and root maintence turnover
+        If resorption N available > max_Nstorage, extra N goes into FSN_in - YES
+
+2) outputs
+Excess_carbon
+CHANGED NBG STARTING SOIL MSN TO 0 in init.nbg file
+CHECK ( 9.01 and 9.24.2003):
+- Excess should go to 0 and the required N taken from nstorage before the excess C is taken from carbon  balance or added to fsn_in  - YES
+- Nstorage should be reduced by n needed for excess c amount if the
+pool is large enough - yes
+
+6.12.13
+
+Run the simple version of the model and continue to check for
+dynamics..change git commit 62a4edb back to the simple version..pft 2, 
+
+CHECKS: 
+fsn_in does not exceed 100% N from leaf and fine root turnover and
+does not go below 0.52% of N from leaf and fine root turnover - YES,
+added print statements and committed to git
+
+Updated nstorage for subrouine transfer_C_from_storage in growth
+balive. commited change. This subroutine does not appear to be
+used. If the plant needs C from stoarge  it will use N from storage
+also.
+
+Went through rest of code in growth_balive file. everything looks
+good. Updated some notes in subroutines and one section in
+growth_balive restricting nstorage chagne only when incement <0.   ran model for a year and
+forest N = 2.067 at start, at endforest N =2.067 .. looks good
+commited to git
+
+CHANGED ED2IN settings to larger run and  ran model for a yr. Forest N
+is increasing at daily timesteps.... 
+
+
+Change disturbance back to 0.007, run model.. forest n still increases
+at daily time steps, as expected
+
+Change pft's back to 2, run model.. CRASH, 'I found a cohort with
+PFT=3  and it is not in your include_these_pft...'. put back to
+1,2,3,4 
+
+Change nbg state to 0 instead of 2, run model, forest N slowly
+increasess at last digit, daily interval
+
+Run nbg = 0, include theses pft's, only 2, looks good. 
+Running with only 1 pft at at time , forest N is stable  on a daily
+basis but when i run with multiple pft's it increases..
+
+CHECKOUT previous versions of model to see when this daily increase
+appears.. not in dd24094..
+
+
+LOGS FROM TODAY ARE MISSING.. I must have done somehting in git..
+found 2 errors. 1) endo satement was before call litter.. this is now
+fixed
+2) nstorage being filled by soil.. used nitrogen_uptake istead of
+cpatch%actual_nitrogen_uptake(ico) for calculation
+Daily Forest N values are consistent. Monthly values are stable, but
+longer runs have a slow increase in forest N.. ex. start
+
+Changed the  alloc_plant_c_balance subroutine. incrment term.. when it
+was positive, N was being added to N storage.Forest N is now stable
+over day, month, year
+
+NEXT: CHECK DYNAMICS IN STRUCTURAL.GROWTH file...do a run and
+visualize N terms with larger forest.. 
+ 
+GROWTH_BALIVE FILE (specific things noted)
+
+1) Nstorage value initialized to 0 on day 1? YES
+2) Does Nstorage retain its value from the end of day1 to day 2? YES
+3) Does Nstoarge reatin its value from the end of 1 month to the beginning of the next month?  Yes
+4) Does Nstoarge reatin its value from the end of 1 year to the beginning of the next year? Yes
+5) No N loss associated with respiration.. LOOKS GOOD
+6) FSN_IN should not be updated after bstorage respiration calculations, C loss does not mean N loss -  LOOKS GOOD
+7) shadow N uptake should be 0 before the shadow calculation - 
+
+
+Add hydrological n losses 
+6.18.13
+Met with David. interested in disturbance and so we should add fluxes
+that will likely be affected by disturbance.
+
+INPUTS
+Ndep = constant .0005kg N/m2/yr - disturbance wount change this input
+abitoic N fixation - not sure. look to see if any realtionships are known
+BNF - linked by tree death/presence
+
+EXPORTS:
+hydrologic N losses - veg cover will alter water budget.. this should
+be linked to water ( precip - evaporation - transpiration)
+Gas losses - correlated with msn (hedin et al 2003), msn will be linked to veg fsn_in.. temp and moisutre, which will change with disturbance
+
+Added hydrologic losses ( target ForestN after leaching  (1.072706 )
+                                                                                         1.072206-1.021706
+                                                                                      
+                                                                                       
+
+!leaching1 = occurs only when fractw==1 and input>0,..f_leach = .1, no leaching occured because fract never = 1
+!leaching2 =  occured anytime input >0,  f_leach = 0.1,forest N fell too fast
+!leaching3= occurs when fractw >.90 and input>0,..f_leach = .1. ForestN stayed constant. no leaching because leaching term was too small
+!leaching4 = occurs when fractw >.90 and input>0,..f_leach = .5 Same
+as above, leaching was not great enough to change ForestN and did not occur very often
+!leaching4 = occurs when fractw >.90 and input>0,..f_leach=.9.. Forest N after a  year is 1.072705 .. This is still too small
+!leaching5 = occurs when fractw >.85 and input>0,..f_leach=.9.. Forest N after a  year is1.072703  .. .. This is still too small
+!leaching6 = occurs when fractw >.80 and input>0,..f_leach=.9.. Forest N after a  year is  1.072703  .. This is still too small
+
+6.19.13
+Worked with Xiangtao and anna. changed leaching to look at field capacity vs soil water content.. also msn availability is based on
+plants getting priority
+ 
+Leaching 5 : capacity, plants take msn before [N] is calculated,100% leached out , Forest N =     1.072703 (too small)
+Leaching 6.  need more water running through, changed water input to
+csite%wbudget_precipgain(ipa), ForestN =   1.072699 
+Reasoning: evaporation and transpiration will be done at the end of hte day? and will alter the soil water conent so there is no need to
+subtract  off these variables at this point in time. Also the time scales of when transpiraiton and evaporation happen are longer then
+timescales for when  percolation happens.. and if it rains, there is probably no evaporation right away because of the relative humidity at 
+saturation
+
+Leaching 7. soil_water > 0.9*field capacity, ForestN =1.072697 still too small
+Leaching 8. soil_water > 0.8*field capacity, ForestN =1.072697 ( i wonder if I compiled this run)
+Leaching 9. soil_water > 0.7*field capacity, ForestN =1.072697
+Leaching 10. soil_water > 0.6*field capacity, ForestN =1.072697
+Leaching 10. soil_water > 0.5*field capacity, ForestN =1.072697
+Leaching 10. soil_water > 0.01*field capacity, ForestN =1.072697
+
+
+6.20.13
+
+CONCLUSION: concentration is too low to make big enough difference.. need to concentrate the soil soilution. Do this by reducing the soil depth from 6 to 1.5 ( where almost all fine roots are found in tropical forest system Jackson 2006)
+
+TARGET: Added hydrologic losses (target ForestN after leaching start: 1.072706 , end: 1.072206-1.021706
+
+Ran a bunch of simulations and then realized tha the water input
+calculation was wrong.. divided y sec in day instead of multiplying
+. doing new runs
+
+
+OVERALL: leaching is a little low, but right order of magnitude and within range observed in Hawaii, USE:  0.5 capacity, 2m depth, 0 retained fraction
+
+Noticed that
+
+____________________________________________________________________________________________________________________
+N storage dynamics: 
+
+Files that contain nstorage dynamics:vegetation_dynamics;structural_growth;reproduction;phenology_driv;phenology_aux;growth_balive;events;disurbance
+
+General structure of nstorage: 
+Nstorage inputs - 1) soil and 2) retranslocation from roots and leaves (growth_balive file) . Fills to a max of 1.33 x canopy N
+Nstorage outputs - used during disturbance, leafout, and  when MSN < N_uptake(excess C exists).. 
+Plant death - all N goes to fast soil N pool or slow soil N pool depending on N in plant structure. N in nstorage goes to fast N pool [disturbance, old age]
+New cohorts: initialze Nstorage to 0 - phenology_aux.f90, subroutine subroutine pheninit_balive_bstorage[CURRENTLY PROBLEMATIC]
+
+
